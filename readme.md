@@ -1,3 +1,13 @@
+Requirements
+===
+
+- posix
+- pcntl
+- [proctitle](http://pecl.php.net/package/proctitle)
+- [libzmq](https://github.com/zeromq/libzmq)
+- [php-zmq](https://github.com/mkoppanen/php-zmq)
+
+
 Tip
 ===
 
