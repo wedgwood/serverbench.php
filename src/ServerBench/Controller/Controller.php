@@ -146,15 +146,12 @@ class Controller
             SysLogger::debug('controller do keepalive...');
 
             foreach ($this->worker_ as $process) {
-                if ($process->pid()) {
-                    if ($process->keepalive()) {
-                        continue;
-                    } else {
-                        SysLogger::error(sprintf(
-                            'worker[%d] has died', $process->pid()
-                        ));
-                        $process->terminate();
-                    }
+                if ($process->keepalive()) {
+                    continue;
+                } else {
+                    SysLogger::error(sprintf(
+                        'worker[%d] has died', $process->pid()
+                    ));
                 }
 
                 $rc = $process->revive();
@@ -170,28 +167,23 @@ class Controller
             }
 
             foreach ($this->proxy_ as $process) {
-                if ($process->pid()) {
-                    if ($process->keepalive()) {
-                        continue;
-                    } else {
-                        SysLogger::error(sprintf(
-                            'worker[%d] has died', $process->pid()
-                        ));
-                        $process->terminate();
-                    }
+                if ($process->keepalive()) {
+                    continue;
+                } else {
+                    SysLogger::error(sprintf(
+                        'proxy[%d] has died', $process->pid()
+                    ));
                 }
 
                 $rc = $process->revive();
 
                 if ($rc) {
                     SysLogger::error(sprintf(
-                        'worker[%d] has been revived successfully',
+                        'proxy[%d] has been revived successfully',
                         $process->pid()
                     ));
                 } else {
-                    SysLogger::error(sprintf(
-                        'worker[%d] has died', $process->pid()
-                    ));
+                    SysLogger::error('proxy has been revived failed!');
                 }
             }
 
@@ -199,33 +191,28 @@ class Controller
         }
 
         foreach ($this->worker_ as $pid => $process) {
-            if ($process->pid()) {
-                while (true) {
-                    $process->terminate();
+            while ($process->keepalive()) {
+                $process->terminate();
 
-                    if (!$process->wait(false)) {
-                        usleep(40);
-                        continue;
-                    }
-
-                    break;
+                if (!$process->wait(false)) {
+                    usleep(40);
+                    continue;
                 }
 
+                break;
             }
         }
 
         foreach ($this->proxy_ as $pid => $process) {
-            if ($process->pid()) {
-                while (true) {
-                    $process->terminate();
+            if ($process->keepalive()) {
+                $process->terminate();
 
-                    if (!$process->wait(false)) {
-                        usleep(40);
-                        continue;
-                    }
-
-                    break;
+                if (!$process->wait(false)) {
+                    usleep(40);
+                    continue;
                 }
+
+                break;
             }
         }
     }

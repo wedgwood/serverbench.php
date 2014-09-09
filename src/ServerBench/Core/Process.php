@@ -12,7 +12,7 @@ namespace ServerBench\Core;
 
 class Process
 {
-    private $pid_  = 0;
+    private $pid_ = NULL;
     private $title_;
     private $cb_;
 
@@ -28,7 +28,17 @@ class Process
 
     public function keepalive()
     {
-        return $this->pid_ && posix_kill($this->pid_, 0);
+        $ret = false;
+
+        if ($this->pid_) {
+            if (posix_kill($this->pid_, 0)) {
+                $ret = true;
+            } else {
+                $this->pid_ = NULL;
+            }
+        }
+
+        return $ret;
     }
 
     public function terminate()
@@ -81,7 +91,10 @@ class Process
 
     public function revive()
     {
-        $this->pids_ = -1;
+        if ($this->keepalive()) {
+            return false;
+        }
+
         return $this->run_();
     }
 
@@ -94,6 +107,8 @@ class Process
 
             if ($rc <= 0) {
                 $ret = false;
+            } else {
+                $this->pid_ = NULL;
             }
         }
 
