@@ -21,7 +21,29 @@ class Coder extends Errorable
     {
         $ret = true;
 
-        if (is_string($coder)) {
+        if (is_array($coder)) {
+            if (!isset($coder['pack']) || !isset($coder['unpack'])) {
+                $this->setErr_(-1, 'custom coder misses entry[pack,unpack]');
+                $ret = false;
+            } else {
+                $this->coder_  = array(
+                    'pack'    => $coder['pack'],
+                    'unpack'  => $coder['unpack']
+                );
+            }
+        } elseif (class_exists($coder) || is_object($coder)) {
+            if (!method_exists($coder, 'pack') ||
+                !method_exists($coder, 'unpack')
+            ) {
+                $this->setErr_(-1, 'custom coder misses methods[pack,unpack]');
+                $ret = false;
+            } else {
+                $this->coder_  = array(
+                    'pack'    => array($coder, 'pack'),
+                    'unpack'  => array($coder, 'unpack')
+                );
+            }
+        } elseif (is_string($coder)) {
             switch ($coder) {
                 case 'json':
                     $this->coder_  = array(
@@ -51,18 +73,6 @@ class Coder extends Errorable
                     $this->setErr_(-1, sprintf('[%s] not supported', $coder));
                     $ret = false;
             }
-        } elseif (class_exists($coder)) {
-            if (!method_exists($coder, 'pack') ||
-                !method_exists($coder, 'unpack')
-            ) {
-                $this->setErr_(-1, 'custom coder misses methods[pack,unpack]');
-                $ret = false;
-            }
-
-            $this->coder_  = array(
-                'pack'    => array($coder, 'pack'),
-                'unpack'  => array($coder, 'unpack')
-            );
         } else {
             $this->setErr_(-1, 'no valid coder given');
             $ret = false;
