@@ -149,13 +149,8 @@ class App extends Errorable
         return $ret;
     }
 
-    public function errstr()
+    public function __invoke()
     {
-        return $this->errstr_;
-    }
-
-    public function errno()
-    {
-        return $this->errno_;
+        return $this->client_;
     }
 }
