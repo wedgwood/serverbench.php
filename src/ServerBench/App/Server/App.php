@@ -136,18 +136,35 @@ class App
         ConsoleLogger::info('... import apis');
 
         $c = new \ServerBench\Controller\Controller();
-        $rc = $proxy_api = new \ServerBench\Api\Api();
 
-        if (false === $rc) {
-            ConsoleLogger::error('[!]failed to import api for proxy');
-            ConsoleLogger::error("\n\n====== BOOTSTRAP FAILED ======\n");
-            return false;
-        }
-
+        // no use now
+        $proxy_api = new \ServerBench\Api\Api();
         $worker_api = new \ServerBench\Api\Api();
 
-        $rc = $worker_api->import(Config::get('app.api'));
-        ConsoleLogger::info('app.api  ' . Config::get('app.api'));
+        $api_class  = Config::get('app.api');
+
+        if (!class_exists($api_class)) {
+            $path = str_replace('{APP_DIR}', APP_DIR, $api_class);
+
+            do {
+                if (file_exists($path)) {
+                    $pi = pathinfo($path);
+                    $api_class = $pi['filename'];
+                    require $path;
+
+                    if (class_exists($api_class)) {
+                        break;
+                    }
+                }
+
+                ConsoleLogger::error('[!]failed get api for worker');
+                ConsoleLogger::error("\n\n====== BOOTSTRAP FAILED ======\n");
+                return false;
+            } while (0);
+        }
+
+        $rc = $worker_api->import($api_class);
+        ConsoleLogger::info('app.api  ' . $api_class);
 
         if (false === $rc || $worker_api->isEmpty()) {
             ConsoleLogger::error('[!]failed to import api for worker');
