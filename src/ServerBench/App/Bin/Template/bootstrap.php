@@ -14,7 +14,6 @@ assert_options(ASSERT_ACTIVE, 1);
 date_default_timezone_set('PRC');
 
 require __DIR__ . '/../../vendor/autoload.php';
-require __DIR__ . '/src/TestClass.php';
 
 use ServerBench\App\Server\App as ServerApp;
 
