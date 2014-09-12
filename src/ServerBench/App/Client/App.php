@@ -149,6 +149,18 @@ class App extends Errorable
         return $ret;
     }
 
+    public function request($data)
+    {
+        $ret = false;
+        $rc = $this->send($data);
+
+        if ($rc) {
+            $ret = $this->recv();
+        }
+
+        return $ret;
+    }
+
     public function __invoke()
     {
         return $this->client_;
