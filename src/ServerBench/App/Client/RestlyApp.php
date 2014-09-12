@@ -57,4 +57,33 @@ class RestlyApp extends App
 
         return $this->send($request);
     }
+
+    public function call($verb, $res, $data)
+    {
+        $ret = false;
+        $rc = false;
+
+        switch ($verb) {
+            case RestlyMethod::GET:
+                $rc = $this->get($res, $data);
+                break;
+            case RestlyMethod::POST:
+                $rc = $this->post($res, $data);
+                break;
+            case RestlyMethod::PUT:
+                $rc = $this->put($res, $data);
+                break;
+            case RestlyMethod::DELETE:
+                $rc = $this->delete($res, $data);
+                break;
+            default:
+                break;
+        }
+
+        if ($rc) {
+            $ret = $this->recv();
+        }
+
+        return $ret;
+    }
 }
