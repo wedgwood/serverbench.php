@@ -17,7 +17,23 @@ class Config
     static public function importIniFile($file)
     {
         $data = parse_ini_file($file, true);
-        self::importArray($data);
+        return self::importArray($data);
+    }
+
+    /**
+     * import json which's structure is ini-like
+     * e.g. '{"sec_1": {"a" : "a"}, "sec_2": {"b" : "b"}}'
+     */
+    static public function importJsonFile($file)
+    {
+        $raw = file_get_contents($file);
+        $data = json_decode($raw, true);
+
+        if (json_last_error()) {
+            return false;
+        }
+
+        return self::importArray($data);
     }
 
     static public function importArray($data)
@@ -27,6 +43,8 @@ class Config
                 self::set($title . '.' . $key, $val);
             }
         }
+
+        return true;
     }
 
     static public function set($key, $val)
