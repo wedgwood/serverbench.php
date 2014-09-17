@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [[ $# -lt 1 ]]; then
+    echo 'usage: createapp {app_dir} [restly]'
+fi
+
+bin_dir=$(dirname $0)
+app_dir=$1
+
+mkdir -p $app_dir/conf $app_dir/log $app_dir/src $app_dir/client
+
+cp $bin_dir/Template/apputil $app_dir/
+cp $bin_dir/Template/bootstrap.php $app_dir/
+cp $bin_dir/Template/conf/*.ini $app_dir/conf/
+
+chmod +x $app_dir/apputil
+
+if [[ $# -gt 1 ]] && [[ $2 = "restly" ]]; then
+    cp $bin_dir/Template/src/restly/*.php $app_dir/src
+    cp $bin_dir/Template/client/restly/*.php $app_dir/client
+else
+    cp $bin_dir/Template/src/*.php $app_dir/src
+    cp $bin_dir/Template/client/*.php $app_dir/client
+fi

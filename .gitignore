@@ -1,0 +1,6 @@
+tags
+vendor
+#composer.phar
+composer.lock
+*.log
+.pid
