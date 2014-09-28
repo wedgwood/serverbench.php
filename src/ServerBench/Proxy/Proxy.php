@@ -60,6 +60,9 @@ class Proxy
         $poller->add($connector, ZMQ::POLL_IN);
 
         $loop = Loop::getInstance();
+        $recv_stopped = true;
+
+        // xhprof_enable(XHPROF_FLAGS_CPU + XHPROF_FLAGS_MEMORY);
 
         while ($loop()) {
             try {
@@ -96,8 +99,9 @@ class Proxy
 
                                 $worker_pool->push($worker);
 
-                                if (1 == $worker_pool->count()) {
+                                if ($recv_stopped) {
                                     $poller->add($acceptor, ZMQ::POLL_IN);
+                                    $recv_stopped = false;
                                 }
 
                                 $empty = $socket->recv(ZMQ::MODE_NOBLOCK);
@@ -142,7 +146,7 @@ class Proxy
                                 return false;
                             }
                         }
-                    } elseif ($worker_pool->count()) {
+                    } elseif (!$worker_pool->isEmpty()) {
                         while (true) {
                             $client = $socket->recv(ZMQ::MODE_NOBLOCK);
 
@@ -171,6 +175,7 @@ class Proxy
 
                             if ($worker_pool->isEmpty()) {
                                 $poller->remove($acceptor);
+                                $recv_stopped = true;
                                 break;
                             }
                         }
@@ -180,6 +185,14 @@ class Proxy
                 }
             }
         }
+
+        // $xhprof_data = xhprof_disable();
+        // $xhprof_root = '/var/www/html/xhprof/';
+        // include_once $xhprof_root . '/xhprof_lib/utils/xhprof_lib.php';
+        // include_once $xhprof_root . '/xhprof_lib/utils/xhprof_runs.php';
+        // $xhprof_runs = new \XHProfRuns_Default('/tmp/xhprof/');
+        // $run_id = $xhprof_runs->save_run($xhprof_data, 'xhprof_sb');
+        // SysLogger::debug('xhprof_html/index.php?run=' . $run_id . '&source=xhprof_sb');
 
         $api->exists('handleFini') && $api->call('handleFini');
     }
