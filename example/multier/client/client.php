@@ -13,17 +13,18 @@ function mt() {
     return intval((float)$usec * 1000000 + (int)$sec * 1000000);
 }
 
-$app1 = new ClientApp();
-$app1->init('tcp://127.0.0.1:24816', 'json');
+define('NUM_OF_CLIENTS',  3);
+define('NUM_OF_PACKAGES', 100000);
 
-$app2 = new ClientApp();
-$app2->init('tcp://127.0.0.1:24816', 'json');
+$clients = array();
 
-$app3 = new ClientApp();
-$app3->init('tcp://127.0.0.1:24816', 'json');
+for ($i = 0; $i < NUM_OF_CLIENTS; ++$i) {
+    $client = new ClientApp();
+    $client->init('tcp://127.0.0.1:24816', 'json');
+    $client->left = NUM_OF_PACKAGES;
+    $clients[] = $client;
+}
 
-
-$start = mt();
 $msg = <<<M
 1234567890
 1234567890
@@ -37,55 +38,37 @@ $msg = <<<M
 1234567890
 M;
 
-for ($i = 0; $i < 100000; ++$i) {
+$start = mt();
+
+for ($i = 0; $i < NUM_OF_PACKAGES; ++$i) {
     $m = new Multier();
 
-    $rc = $app1->send(array('data' => $msg, 'seq' => $i));
+    for ($j = 0; $j < NUM_OF_CLIENTS; ++$j) {
+        $rc = $clients[$j]->send(array('data' => $msg, 'seq' => $j));
 
-    if (false === $rc) {
-        echo 'failed to send msg. ', $app1->errno(), "\n";
-        die();
+        if (false === $rc) {
+            echo 'failed to send msg. ', $clients[$j]->errno(), "\n";
+            die();
+        }
     }
 
-    $rc = $app2->send(array('data' => $msg, 'seq' => $i));
-
-    if (false === $rc) {
-        echo 'failed to send msg. ', $app2->errno(), "\n";
-        die();
-    }
-
-    $rc = $app3->send(array('data' => $msg, 'seq' => $i));
-
-    if (false === $rc) {
-        echo 'failed to send msg. ', $app3->errno(), "\n";
-        die();
-    }
-
-    $reply = $m->fetch(array($app1, $app2, $app3), 400);
+    $reply = $m->fetch($clients, 1000);
 
     if (false === $reply) {
         echo 'multier failed to recv msg. ', $m->errstr(), "\n";
         die();
     }
 
-    if (!$reply[0]) {
-        echo 'app1 failed to recv msg. ', $app1->errno(), "\n";
-        die();
-    }
-
-    if (!$reply[1]) {
-        echo 'app2 failed to recv msg. ', $app2->errno(), "\n";
-        die();
-    }
-
-    if (!$reply[2]) {
-        echo 'app3 failed to recv msg. ', $app3->errno(), "\n";
-        die();
+    for ($j = 0; $j < NUM_OF_CLIENTS; ++$j) {
+        if (!$reply[$j]) {
+            echo 'app1 failed to recv msg. ', $clients[$j]->errno(), "\n";
+            die();
+        }
     }
 }
 
 $end = mt();
 $delta = $end - $start;
-$speed = 100000 / $delta * 1000000 * 60 * 3;
+$speed = NUM_OF_PACKAGES / $delta * 1000000 * NUM_OF_CLIENTS;
 
-echo "use {$delta} ms, speed {$speed} pkg / min \n";
+echo "use {$delta} ms, speed {$speed} pkg / sec \n";
