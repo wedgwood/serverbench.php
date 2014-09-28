@@ -125,7 +125,7 @@ class Controller
 
         while ($loop()) {
             try {
-                $events = $poller->poll($readable, $writable, 4000);
+                $events = $poller->poll($readable, $writable, 40000);
                 $errors = $poller->getLastErrors();
 
                 if (count($errors) > 0) {
