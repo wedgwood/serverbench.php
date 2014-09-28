@@ -65,6 +65,7 @@ class Worker
     public function heartbeat_()
     {
         $ret = false;
+        SysLogger::debug('worker do heartbeat ...');
 
         try {
             $this->acceptor_->sendmulti(array('', WorkerCmd::HEARTBEAT));
@@ -102,7 +103,12 @@ class Worker
             }
         }
 
+        $need_poll = false;
+        // xhprof_enable(XHPROF_FLAGS_CPU + XHPROF_FLAGS_MEMORY);
+
         while ($loop()) {
+            $now = time();
+
             if ($need_setup) {
                 if ($this->acceptor_) {
                     $poller->remove($this->acceptor_);
@@ -127,76 +133,85 @@ class Worker
                 }
 
                 $need_heartbeat = false;
-                $last_heartbeat = time();
+                $last_heartbeat = $now;
                 continue;
             }
 
-            try {
-                $events = $poller->poll($readable, $writable, $wait_ms);
-                $errors = $poller->getLastErrors();
+            if ($need_poll) {
+                try {
+                    $events = $poller->poll($readable, $writable, $wait_ms);
+                    $errors = $poller->getLastErrors();
 
-                if (count($errors) > 0) {
-                    foreach ($errors as $error) {
-                        SysLogger::error('error polling ' . $error);
+                    if (count($errors) > 0) {
+                        foreach ($errors as $error) {
+                            SysLogger::error('error polling ' . $error);
+                        }
                     }
-                }
-            } catch (ZMQPollException $e) {
-                if (4 == $e->getCode()) {
-                    continue;
-                }
 
-                SysLogger::error('unexpected exception: ' .
-                    $e->getMessage() . '. worker exits.'
-                );
+                    if ($events <= 0) {
+                        continue;
+                    }
+                } catch (ZMQPollException $e) {
+                    if (4 == $e->getCode()) {
+                        continue;
+                    }
 
-                return false;
+                    SysLogger::error('unexpected exception: ' .
+                        $e->getMessage() . '. worker exits.'
+                    );
+
+                    return false;
+                }
             }
 
             try {
-                if ($events > 0) {
-                    $client = $this->acceptor_->recv();
-                    $empty = $this->acceptor_->recv();
+                $client = $this->acceptor_->recv(ZMQ::MODE_NOBLOCK);
 
-                    // invalid msg
-                    assert(empty($empty));
-
-                    $message = $this->acceptor_->recv();
-                    $reply   = '';
-                    $resp    = NULL;
-
-                    try {
-                        $data = NULL;
-
-                        if ($coder) {
-                            $data = $coder->unpack($message);
-                        } else {
-                            $data = $message;
-                        }
-
-                        $resp = call_user_func($handle_process, $data);
-                    } catch (Exception $e) {
-                        SysLogger::error(
-                            'exception catched from handleProcess: ' .
-                            $e->getMessage()
-                        );
-                    }
-
-                    if ($resp !== false) {
-                        if ($coder) {
-                            $reply = $coder->pack($resp);
-                        }
-                    }
-
-                    $this->acceptor_->sendmulti(array('', $client, '', $reply));
+                if (false === $client) {
+                    $need_poll = true;
+                    continue;
                 }
 
-                if (!$need_heartbeat) {
-                    $now = time();
+                $empty = $this->acceptor_->recv();
 
-                    if ($now - $last_heartbeat > $heartbeat_interval) {
-                        $need_heartbeat = true;
+                // invalid msg
+                assert(empty($empty));
+
+                $message = $this->acceptor_->recv();
+                $reply   = '';
+                $resp    = NULL;
+
+                try {
+                    $data = NULL;
+
+                    if ($coder) {
+                        $data = $coder->unpack($message);
+                    } else {
+                        $data = $message;
+                    }
+
+                    $resp = call_user_func($handle_process, $data);
+                } catch (Exception $e) {
+                    SysLogger::error(
+                        'exception catched from handleProcess: ' .
+                        $e->getMessage()
+                    );
+                }
+
+                if ($resp !== false) {
+                    if ($coder) {
+                        $reply = $coder->pack($resp);
                     }
                 }
+
+                $this->acceptor_->sendmulti(array('', $client, '', $reply));
+                $last_heartbeat = $now;
+
+                // if (!$need_heartbeat) {
+                    // if ($now - $last_heartbeat > $heartbeat_interval) {
+                        // $need_heartbeat = true;
+                    // }
+                // }
             } catch (ZMQSocketException $e) {
                 if (4 == $e->getCode()) {
                     continue;
@@ -209,6 +224,14 @@ class Worker
                 return false;
             }
         }
+
+        // $xhprof_data = xhprof_disable();
+        // $xhprof_root = '/var/www/html/xhprof/';
+        // include_once $xhprof_root . '/xhprof_lib/utils/xhprof_lib.php';
+        // include_once $xhprof_root . '/xhprof_lib/utils/xhprof_runs.php';
+        // $xhprof_runs = new \XHProfRuns_Default('/tmp/xhprof/');
+        // $run_id = $xhprof_runs->save_run($xhprof_data, 'xhprof_sb');
+        // SysLogger::debug('xhprof_html/index.php?run=' . $run_id . '&source=xhprof_sb');
     }
 
     public function run($conf)
