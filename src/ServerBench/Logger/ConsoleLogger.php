@@ -22,4 +22,14 @@ class ConsoleLogger
     {
         echo Colorizer::green($msg), "\n";
     }
+
+    static public function success($msg)
+    {
+        echo Colorizer::green('[success] '), $msg, "\n";
+    }
+
+    static public function failed($msg)
+    {
+        echo Colorizer::red('[failed] '), $msg, "\n";
+    }
 }
