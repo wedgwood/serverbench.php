@@ -28,15 +28,12 @@ class Multier extends Errorable
     public function fetch($clients, $timeout_ms = 0)
     {
         $poller        = new ZMQPoll();
-        $socket2client = array();
-        $ret_map       = array();
+        $socket2client = new \SplObjectStorage();
         $ret           = NULL;
 
         foreach ($clients as $key => $client) {
-            $s                  = $client();
-            $sh                 = spl_object_hash($s);
-            $socket2client[$sh] = $client;
-            $ret_map[$sh]       = $key;
+            $s = $client();
+            $socket2client[$s] = array($client, $key);
             $poller->add($s, ZMQ::POLL_IN);
         }
 
@@ -44,8 +41,8 @@ class Multier extends Errorable
         $ret     = array_fill(0, count($clients), NULL);
 
         do {
-            $readable      = array();
-            $writable      = array();
+            $readable = array();
+            $writable = array();
 
             try {
                 if ($ms_left > 0) {
@@ -85,14 +82,14 @@ class Multier extends Errorable
 
             if ($events > 0) {
                 foreach ($readable as $s) {
-                    $sh = spl_object_hash($s);
-                    $client = $socket2client[$sh];
+                    $client = $socket2client[$s][0];
+                    $key = $socket2client[$s][1];
 
                     try {
                         $msg = $client->recv();
-                        $ret[$ret_map[$sh]] = $msg;
+                        $ret[$key] = $msg;
                     } catch (ZMQSocketException $e) {
-                        $res[$ret_map[$sh]] = false;
+                        $res[$key] = false;
                     }
 
                     $poller->remove($s);
