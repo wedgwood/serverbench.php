@@ -48,7 +48,7 @@ class App
         define('APP_PID_PATH', APP_DIR . '/.pid');
 
         if (file_exists(APP_PID_PATH)) {
-            ConsoleLogger::failed('[!]one instance of the app is running');
+            ConsoleLogger::failed('one instance of the app is running');
             return false;
         }
 
