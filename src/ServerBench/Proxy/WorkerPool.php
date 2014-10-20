@@ -11,17 +11,22 @@ namespace ServerBench\Proxy;
 
 class WorkerPool
 {
-    const WORKER_LOAD_MAX = 10;
     private $pool_ = array();
+    private $worker_load_max_;
+
+    public function __construct($worker_load_max)
+    {
+        $this->worker_load_max_ = $worker_load_max;
+    }
 
     public function push($worker)
     {
         if (isset($this->pool_[$worker]) &&
-            $this->pool_[$worker] < self::WORKER_LOAD_MAX
+            $this->pool_[$worker] < $this->worker_load_max_
         ) {
             ++$this->pool_[$worker][1];
         } else {
-            $this->pool_[$worker] = array($worker, self::WORKER_LOAD_MAX);
+            $this->pool_[$worker] = array($worker, $this->worker_load_max_);
         }
     }
 
