@@ -185,7 +185,8 @@ class App
                 'name'               => $app_name . '[proxy]',
                 'acceptor'           => Config::get('app.bind'),
                 'connector'          => Config::get('proxy.connector'),
-                'api'                => $proxy_api
+                'api'                => $proxy_api,
+                'worker_load_max'    => Config::get('proxy.worker_load_max')
             ),
             'worker'                 => array(
                 'name'               => $app_name . '[worker]',
