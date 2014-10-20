@@ -102,5 +102,6 @@ class Timer extends \ServerBench\Core\Singleton
     public function clear()
     {
         $this->queue_ = new TaskQueue();
+        return $this;
     }
 }
