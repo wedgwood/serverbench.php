@@ -51,7 +51,13 @@ class Proxy
         $handle_input = $api->exists('handleInput') ?
             $api->getCallable('handleInput') : NULL;
 
-        $worker_pool = new WorkerPool();
+        $worker_load_max = 100;
+
+        if (isset($conf['worker_load_max'])) {
+            $worker_load_max = $conf['worker_load_max'];
+        }
+
+        $worker_pool = new WorkerPool($worker_load_max);
 
         $writable = array();
         $readable = array();
