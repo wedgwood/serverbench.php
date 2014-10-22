@@ -23,13 +23,13 @@ class App
 
         foreach (array('zmq', 'pcntl', 'posix') as $ext) {
             if (extension_loaded($ext)) {
-                ConsoleLogger::info(sprintf(
-                    '[pass]extension(%s) loaded',
+                ConsoleLogger::success(sprintf(
+                    'extension(%s) loaded',
                     $ext
                 ));
             } else {
-                ConsoleLogger::error(sprintf(
-                    '[failed]extension(%s) not loaded',
+                ConsoleLogger::failed(sprintf(
+                    'extension(%s) not loaded',
                     $ext
                 ));
 
@@ -48,29 +48,29 @@ class App
         define('APP_PID_PATH', APP_DIR . '/.pid');
 
         if (file_exists(APP_PID_PATH)) {
-            ConsoleLogger::error('[!]one instance of the app is running');
+            ConsoleLogger::failed('one instance of the app is running');
             return false;
         }
 
         if (!$this->check()) {
-            ConsoleLogger::error("\n\n====== BOOTSTRAP FAILED ======\n");
+            ConsoleLogger::failed("\n\n====== BOOTSTRAP FAILED ======\n");
             return false;
         }
 
-        ConsoleLogger::info('APP_DIR  ' . APP_DIR);
+        ConsoleLogger::success('APP_DIR  ' . APP_DIR);
 
         if (!$conf_dir) {
             $conf_dir = APP_DIR . 'conf';
         }
 
-        ConsoleLogger::info('CONF_DIR ' . $conf_dir);
-        ConsoleLogger::info('... import serverbench config');
+        ConsoleLogger::success('CONF_DIR ' . $conf_dir);
+        ConsoleLogger::success('... import serverbench config');
 
         if (file_exists($conf_dir . '/serverbench.ini')) {
             Config::importIniFile($conf_dir . '/serverbench.ini');
         }
 
-        ConsoleLogger::info('... import app config');
+        ConsoleLogger::success('... import app config');
 
         if (file_exists($conf_dir . '/app.ini')) {
             Config::importIniFile($conf_dir . '/app.ini');
@@ -133,7 +133,7 @@ class App
 
         Logger::setLogger($app_logger);
 
-        ConsoleLogger::info('... import apis');
+        ConsoleLogger::success('... import apis');
 
         $c = new \ServerBench\Controller\Controller();
 
@@ -157,18 +157,18 @@ class App
                     }
                 }
 
-                ConsoleLogger::error('[!]failed get api for worker');
-                ConsoleLogger::error("\n\n====== BOOTSTRAP FAILED ======\n");
+                ConsoleLogger::failed('failed get api for worker');
+                ConsoleLogger::failed("\n\n====== BOOTSTRAP FAILED ======\n");
                 return false;
             } while (0);
         }
 
         $rc = $worker_api->import($api_class);
-        ConsoleLogger::info('app.api  ' . $api_class);
+        ConsoleLogger::success('app.api  ' . $api_class);
 
         if (false === $rc || $worker_api->isEmpty()) {
-            ConsoleLogger::error('[!]failed to import api for worker');
-            ConsoleLogger::error("\n\n====== BOOTSTRAP FAILED ======\n");
+            ConsoleLogger::failed('failed to import api for worker');
+            ConsoleLogger::failed("\n\n====== BOOTSTRAP FAILED ======\n");
             return false;
         }
 
@@ -185,7 +185,8 @@ class App
                 'name'               => $app_name . '[proxy]',
                 'acceptor'           => Config::get('app.bind'),
                 'connector'          => Config::get('proxy.connector'),
-                'api'                => $proxy_api
+                'api'                => $proxy_api,
+                'worker_load_max'    => Config::get('proxy.worker_load_max')
             ),
             'worker'                 => array(
                 'name'               => $app_name . '[worker]',

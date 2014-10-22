@@ -20,15 +20,17 @@ use ServerBench\Constant\WorkerCmd;
 use ServerBench\Core\Loop;
 use ServerBench\Logger\SysLogger;
 use ServerBench\Message\Coder;
+use ServerBench\Timer\Timer;
 
 class Worker
 {
-    protected $zctx_           = NULL;
-    protected $acceptor_       = NULL;
+    protected $zctx_     = NULL;
+    protected $acceptor_ = NULL;
 
     protected $conf_ = array(
         'wait_ms'            => 30000,
-        'heartbeat_interval' => 60
+        'heartbeat_interval' => 60,
+        'worker_load_max'    => 10
     );
 
     public function __construct()
@@ -62,21 +64,6 @@ class Worker
         return $ret;
     }
 
-    public function heartbeat_()
-    {
-        $ret = false;
-        SysLogger::debug('worker do heartbeat ...');
-
-        try {
-            $this->acceptor_->sendmulti(array('', WorkerCmd::HEARTBEAT));
-            $ret = true;
-        } catch (ZMQSocketException $e) {
-            SysLogger::error('failed to heartbeat, ignore ...');
-        }
-
-        return $ret;
-    }
-
     public function run_()
     {
         $loop = Loop::getInstance();
@@ -87,11 +74,10 @@ class Worker
         $wait_ms            = $this->conf_['wait_ms'];
         $heartbeat_interval = $this->conf_['heartbeat_interval'];
         $need_heartbeat     = false;
-        $need_setup         = true;
-        $last_heartbeat     = 0;
         $api                = $this->conf_['api'];
         $coder              = NULL;
         $handle_process     = $api->getCallable('handleProcess');
+        $timer              = Timer::getInstance()->clear();
 
         if (isset($this->conf_['coder'])) {
             $coder = new Coder();
@@ -103,43 +89,55 @@ class Worker
             }
         }
 
-        $need_poll = false;
-        // xhprof_enable(XHPROF_FLAGS_CPU + XHPROF_FLAGS_MEMORY);
+        $rc = $this->setupSocket_();
+
+        if (false === $rc) {
+            return false;
+        }
+
+        $poller->add($this->acceptor_, ZMQ::POLL_IN);
+
+        $timer->runEvery($heartbeat_interval, function() use(&$need_heartbeat) {
+            if ($need_heartbeat) {
+                SysLogger::debug('worker do heartbeat ...');
+
+                try {
+                    $this->acceptor_->sendmulti(array('', WorkerCmd::HEARTBEAT));
+                } catch (ZMQSocketException $e) {
+                    SysLogger::error('failed to heartbeat, ignore ...');
+                }
+            } else {
+                $need_heartbeat = true;
+            }
+        });
+
+        $continue_recv = true;
 
         while ($loop()) {
-            $now = time();
-
-            if ($need_setup) {
-                if ($this->acceptor_) {
-                    $poller->remove($this->acceptor_);
-                    $this->acceptor_ = NULL;
-                }
-
-                $rc = $this->setupSocket_();
-
-                if (false === $rc) {
-                    return false;
-                }
-
-                $poller->add($this->acceptor_, ZMQ::POLL_IN);
-                $need_setup = false;
-            }
-
-            if ($need_heartbeat) {
-                $rc = $this->heartbeat_();
-
-                if (false === $rc) {
-                    $need_setup = true;
-                }
-
-                $need_heartbeat = false;
-                $last_heartbeat = $now;
-                continue;
-            }
-
-            if ($need_poll) {
+            if (!$continue_recv) {
                 try {
-                    $events = $poller->poll($readable, $writable, $wait_ms);
+                    if ($timer->isEmpty()) {
+                        $events = $poller->poll($readable, $writable, $wait_ms);
+                    } else {
+                        $nearest_delta_time = $timer->nearestDeltaTimeMs();
+
+                        if ($wait_ms > 0 && $wait_ms < $nearest_delta_time) {
+                            $real_wait_ts = $wait_ms;
+                        } else {
+                            if ($nearest_delta_time < 0) {
+                                $nearest_delta_time = 0;
+                            }
+
+                            $real_wait_ts = $nearest_delta_time;
+                        }
+
+                        $events = $poller->poll(
+                            $readable,
+                            $writable,
+                            $real_wait_ts
+                        );
+                    }
+
                     $errors = $poller->getLastErrors();
 
                     if (count($errors) > 0) {
@@ -147,6 +145,9 @@ class Worker
                             SysLogger::error('error polling ' . $error);
                         }
                     }
+
+                    // not execute timer too many times
+                    $timer->execute(50);
 
                     if ($events <= 0) {
                         continue;
@@ -162,13 +163,14 @@ class Worker
 
                     return false;
                 }
+
             }
 
             try {
                 $client = $this->acceptor_->recv(ZMQ::MODE_NOBLOCK);
 
                 if (false === $client) {
-                    $need_poll = true;
+                    $continue_recv = false;
                     continue;
                 }
 
@@ -180,6 +182,7 @@ class Worker
                 $message = $this->acceptor_->recv();
                 $reply   = '';
                 $resp    = NULL;
+                $continue_recv = true;
 
                 try {
                     $data = NULL;
@@ -205,13 +208,7 @@ class Worker
                 }
 
                 $this->acceptor_->sendmulti(array('', $client, '', $reply));
-                $last_heartbeat = $now;
-
-                // if (!$need_heartbeat) {
-                    // if ($now - $last_heartbeat > $heartbeat_interval) {
-                        // $need_heartbeat = true;
-                    // }
-                // }
+                $need_heartbeat = false;
             } catch (ZMQSocketException $e) {
                 if (4 == $e->getCode()) {
                     continue;
@@ -224,14 +221,6 @@ class Worker
                 return false;
             }
         }
-
-        // $xhprof_data = xhprof_disable();
-        // $xhprof_root = '/var/www/html/xhprof/';
-        // include_once $xhprof_root . '/xhprof_lib/utils/xhprof_lib.php';
-        // include_once $xhprof_root . '/xhprof_lib/utils/xhprof_runs.php';
-        // $xhprof_runs = new \XHProfRuns_Default('/tmp/xhprof/');
-        // $run_id = $xhprof_runs->save_run($xhprof_data, 'xhprof_sb');
-        // SysLogger::debug('xhprof_html/index.php?run=' . $run_id . '&source=xhprof_sb');
     }
 
     public function run($conf)
