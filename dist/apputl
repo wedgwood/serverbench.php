@@ -1,0 +1,29 @@
+#!/bin/bash
+if [[ $# -lt 1 ]]; then
+    echo 'usage: apputil {start|stop|ps}'
+fi
+
+app_dir="$(cd "$(dirname "$0")" && pwd -P)"
+cd $app_dir
+
+if [[ $1 = "start" ]]
+then
+  php ./serverbench.phar --pidfile=$app_dir/pid --dir=$app_dir --app=$app_dir/app.php "${@:2}"
+elif [[ $1 = "stop" ]]
+then
+  php ./dist/serverbench.phar --stop --pidfile=$app_dir/pid --dir=$app_dir
+elif [[ $1 = "ps" ]]
+  php ../../dist/serverbench.phar --status --pidfile=$app_dir/pid --dir=$app_dir
+then
+    if [ -f './pid' ]
+    then
+        echo -e "\e[0;32m"
+        pid=`cat pid`
+        ps -o pid,ppid,pgid,sess,tt,user,start_time,time,stat,%cpu,rss,vsz,size,%mem,cmd --pid $pid --ppid $pid
+        echo -e "\e[0m"
+    else
+        echo -e "\e[0;31m"
+        echo "no any running process found!"
+        echo -e "\e[0m"
+    fi
+fi
