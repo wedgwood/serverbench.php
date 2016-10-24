@@ -30,6 +30,7 @@ class Worker
     {
         $this->message_callback_ = $message_callback;
         $zctx = new ZMQContext(1, false);
+        $zctx->setOpt(ZMQ::CTXOPT_MAX_SOCKETS, 65535);
         $this->zctx_ = $zctx;
 
         $ipc0 = new ZMQSocket($zctx, ZMQ::SOCKET_PULL);

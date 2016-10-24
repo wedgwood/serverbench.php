@@ -35,6 +35,7 @@ class Proxy
     public function __construct($listen_addr, $ipcs)
     {
         $zctx = new ZMQContext(1, false);
+        $zctx->setOpt(ZMQ::CTXOPT_MAX_SOCKETS, 65535);
         $this->zctx_ = $zctx;
         $acceptor = new ZMQSocket($zctx, ZMQ::SOCKET_ROUTER);
 

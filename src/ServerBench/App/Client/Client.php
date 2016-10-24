@@ -43,6 +43,7 @@ class Client
         do {
             try {
                 $zctx = new ZMQContext();
+                $zctx->setOpt(ZMQ::CTXOPT_MAX_SOCKETS, 65535);
                 $this->socket_ = $zctx->getSocket(ZMQ::SOCKET_DEALER);
                 $this->socket_->setSockOpt(ZMQ::SOCKOPT_LINGER, 0);
                 $this->socket_->setSockOpt(ZMQ::SOCKOPT_SNDHWM, $this->sndhwm_);
